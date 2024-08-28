@@ -43,14 +43,15 @@ namespace WebSpace
                 HttpWebRequest httpWebRequest = null;
                 if(Jsonbody != null)
                    sendData = UTF8Encoding.UTF8.GetBytes(Jsonbody);
-                if (Method == "POST"|| Method == "PUT")
+                if (Method == "POST"|| Method == "PUT" || Method == "PATCH")
                 {
                     httpWebRequest = (HttpWebRequest)WebRequest.Create(Url);
                     httpWebRequest.ContentType = "application/json";
                     httpWebRequest.Method = Method;
                     httpWebRequest.Timeout = TimeOutTime;
                     httpWebRequest.ContentLength = sendData.Length;
-
+                    //post put patch 같이 데이터를 묶어서 보내는 경우 무조건 데이터를 스트림 만들어서 넣기 전에 헤더나 request에 필요한 요소들을 미리넣어야지 에러가 안난다
+                    Sethead(Token, ref httpWebRequest);
                     using (Stream requestStream = httpWebRequest.GetRequestStream())
                     {
                         requestStream.Write(sendData, 0, sendData.Length);
@@ -63,11 +64,7 @@ namespace WebSpace
                     httpWebRequest = (HttpWebRequest)WebRequest.Create(Url);
                     httpWebRequest.Timeout = TimeOutTime;
                     httpWebRequest.Method = Method;
-                }
-                if (Token != null)
-                {
-                    httpWebRequest.Headers.Add("Authorization","Bearer " + Token[0]);
-                    httpWebRequest.Headers.Add("Cookie", Token[1]);
+                    Sethead(Token, ref httpWebRequest);
                 }
 
                 HttpWebResponse httpWebResponse;
@@ -198,6 +195,17 @@ namespace WebSpace
                 HTTPStatusCode = "네트워크 연결 안됨";
             }
             return net;
+        }
+        /// <summary>
+        /// 리퀘스트 헤드 저장하는 함수
+        /// </summary> 
+        private void Sethead(string[] Token, ref HttpWebRequest httpWebRequest)
+        {
+            if (Token != null)
+            {
+                httpWebRequest.Headers.Add("Authorization", "Bearer " + Token[0]);
+                httpWebRequest.Headers.Add("Cookie", Token[1]);
+            }
         }
         /// <summary>
         /// web exception 에러 모아놓은 함수
