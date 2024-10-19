@@ -1,4 +1,5 @@
 using Cysharp.Threading.Tasks;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -11,16 +12,16 @@ namespace WebSpace
 {
     public class WebConnnection : MonoBehaviour
     {
-        private Dictionary<string, string> GetResponeHeader = new Dictionary<string, string>();
+        private Dictionary<string, string> _ResponeHeader = new Dictionary<string, string>();
         /// <summary>
         /// 응답 HTTP Header dictionary
         /// </summary>
-        public Dictionary<string,string> GetResponeHeader_Public { get => GetResponeHeader; }
+        public Dictionary<string,string> GetResponeHeader { get => _ResponeHeader; }
         /// <summary>
         /// 응답 HTTP Header dictionary
         /// </summary>
         [SerializeField] private int TimeOutTime ;
-        private string HTTPStatusCode;
+        private string HTTPStatusCode = string.Empty;
         /// <summary>
         ///  httpstatuscode
         /// </summary>
@@ -28,10 +29,9 @@ namespace WebSpace
         public async UniTask<string> SendingInformation(string Url, string Method, string Jsonbody = null,string[] Token = null)
         {
             bool caninternet=false;
-            // 메인쓰레드로 스위치
+            
             await UniTask.SwitchToMainThread();
             caninternet= CheckNetwork();
-            // 스레드 풀로 스위치
             await UniTask.SwitchToThreadPool();
 
             if (caninternet == false)
@@ -43,15 +43,14 @@ namespace WebSpace
                 HttpWebRequest httpWebRequest = null;
                 if(Jsonbody != null)
                    sendData = UTF8Encoding.UTF8.GetBytes(Jsonbody);
-                if (Method == "POST"|| Method == "PUT" || Method == "PATCH")
+                if (Method == "POST"|| Method == "PUT" || Method == "PATCH" || Method == "DELETE")
                 {
                     httpWebRequest = (HttpWebRequest)WebRequest.Create(Url);
                     httpWebRequest.ContentType = "application/json";
                     httpWebRequest.Method = Method;
                     httpWebRequest.Timeout = TimeOutTime;
                     httpWebRequest.ContentLength = sendData.Length;
-                    //post put patch 같이 데이터를 묶어서 보내는 경우 무조건 데이터를 스트림 만들어서 넣기 전에 헤더나 request에 필요한 요소들을 미리넣어야지 에러가 안난다
-                    Sethead(Token, ref httpWebRequest);
+                    SetHeadToken(Token, ref httpWebRequest);
                     using (Stream requestStream = httpWebRequest.GetRequestStream())
                     {
                         requestStream.Write(sendData, 0, sendData.Length);
@@ -59,20 +58,19 @@ namespace WebSpace
                         requestStream.Close();
                     }
                 }
-                else if (Method == "GET"|| Method == "DELETE")
+                else if (Method == "GET")
                 {
                     httpWebRequest = (HttpWebRequest)WebRequest.Create(Url);
                     httpWebRequest.Timeout = TimeOutTime;
                     httpWebRequest.Method = Method;
-                    Sethead(Token, ref httpWebRequest);
+                    SetHeadToken(Token, ref httpWebRequest);
                 }
-
                 HttpWebResponse httpWebResponse;
                 using (httpWebResponse = (HttpWebResponse)httpWebRequest.GetResponse())
                 {
-                    GetResponeHeader.Clear();
+                    _ResponeHeader.Clear();
                     for (int i = 0; i < httpWebResponse.Headers.Count; i++)
-                        GetResponeHeader.Add(httpWebResponse.Headers.Keys[i], httpWebResponse.Headers[i]);
+                        _ResponeHeader.Add(httpWebResponse.Headers.Keys[i], httpWebResponse.Headers[i]);
                     StreamReader streamReader = new StreamReader(httpWebResponse.GetResponseStream(), Encoding.GetEncoding("UTF-8"));
                     string result = streamReader.ReadToEnd();
                     returnstr = result;
@@ -96,10 +94,9 @@ namespace WebSpace
         public async UniTask<string> SendingInformation_fileupload(string Url, Dictionary<string, object> Files, string[] Token = null)
         {
             bool caninternet = false;
-            // 메인쓰레드로 스위치
+            
             await UniTask.SwitchToMainThread();
             caninternet = CheckNetwork();
-            // 스레드 풀로 스위치
             await UniTask.SwitchToThreadPool();
 
             if (caninternet == false)
@@ -197,14 +194,14 @@ namespace WebSpace
             return net;
         }
         /// <summary>
-        /// 리퀘스트 헤드 저장하는 함수
-        /// </summary> 
-        private void Sethead(string[] Token, ref HttpWebRequest httpWebRequest)
+        ///  헤드 토큰 설정하는 함수
+        /// </summary>
+        private void SetHeadToken(string[] Token, ref HttpWebRequest httpWebRequest)
         {
             if (Token != null)
             {
-                httpWebRequest.Headers.Add("Authorization", "Bearer " + Token[0]);
-                httpWebRequest.Headers.Add("Cookie", Token[1]);
+                httpWebRequest.Headers["Authorization"] = "Bearer " + Token[0];
+                httpWebRequest.Headers["Cookie"] = Token[1];
             }
         }
         /// <summary>
@@ -212,6 +209,17 @@ namespace WebSpace
         /// </summary>
         private string DebuglogError(WebException oWEx)
         {
+            if (oWEx.Response != null)
+            {
+                using (HttpWebResponse errorResponse = (HttpWebResponse)oWEx.Response)
+                using (Stream responseStream = errorResponse.GetResponseStream())
+                using (StreamReader reader = new StreamReader(responseStream))
+                {
+                    string errorText = reader.ReadToEnd();
+                   Debug.Log ("웹에서 전송 실패할때 들어오는 메세지\n"+ $"WebError: {(int)errorResponse.StatusCode} - {errorResponse.StatusDescription}\n" +
+                       errorText);
+                }
+            }
             WebExceptionStatus oStatus = oWEx.Status;
             string strTimeoutErrorMessage = "A connection attempt failed because the connected party did not properly respond "
                                           + "after a period of time, or established connection failed because connected host has failed to respond";
@@ -272,10 +280,18 @@ namespace WebSpace
                     //----------------------------------------------------------------------
                     //  This is some other Exception
                     //----------------------------------------------------------------------
-                    Debug.LogError("1005 :  WebException error" + oWEx.Message);
-                    value = "1005";
                     HTTPStatusCode = oWEx.Message;
                     HTTPStatusCode =Regex.Replace(HTTPStatusCode, @"[^0-9]", "");
+                    if (HTTPStatusCode == string.Empty)
+                    {
+                        value = "1011";
+                        Debug.LogError("1011 :  WebException error" + oWEx.Message);
+                    }
+                    else
+                    {
+                         value = "1005";
+                        Debug.LogError("1005 :  WebException error" + oWEx.Message);
+                    }
                     break;
             }
             return value;
