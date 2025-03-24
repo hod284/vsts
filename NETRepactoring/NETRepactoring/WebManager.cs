@@ -641,5 +641,36 @@ namespace WebSpace
         {
             result = re;
         }
+        public string ReJson(string toJson, string[] optionArray)
+        {
+           string optionedJson = null;
+           JObject jarray = JObject.Parse(toJson);
+           JObject  jobj = new JObject();
+           for(int i =0; i< optionArray.Length; i++)
+             jobj.Add(optionArray[i], jarray[optionArray[i]]);
+           optionedJson = jobj.ToString(Formatting.None); 
+           Debug.Log("제이슨 선택된 항목만 추가된 형태\n"+ optionedJson);
+           return optionedJson;
+        }
+        private void CheckAccessToken(ref LoginAnswer data)
+        {
+              _WBConnnection.GetResponeHeader.TryGetValue("access_token", out _AcessToken);
+              _WBConnnection.GetResponeHeader.TryGetValue("Set-Cookie", out _RefreshToken);
+                // 중복 로그인 hash
+               string _loginAttemptHash;
+              _WBConnnection.GetResponeHeader.TryGetValue("loginAttemptHash", out _loginAttemptHash);
+
+              if (_loginAttemptHash != null)
+              {
+                  data.loginAttempHash = _loginAttemptHash;
+                   return;
+              }
+
+               if (_AcessToken != null)
+               {
+                  var resolve = Getinformation_token();
+                 SetInformation(resolve, ref data);
+              }
+        }
     }
 }
