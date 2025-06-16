@@ -202,10 +202,11 @@ public class VideoRecordingScript : MonoBehaviour
 
     private async UniTask Merge()
     {
-        await UniTask.RunOnThreadPool(() =>
-         {
-             try
+       try
+        {
+             await UniTask.RunOnThreadPool(() =>
              {
+            
                  string directoryPath = Path.GetDirectoryName(_OutputFilePath);
                  if (!Directory.Exists(directoryPath))
                  {
@@ -233,8 +234,10 @@ public class VideoRecordingScript : MonoBehaviour
                  _Process.Close();
                  _Process.Refresh();
                  UnityEngine.Debug.Log("오디오 병합 완료!");
-                 _MergeOnComplete?.Invoke();
-             }
+                 });
+               await UniTask.SwitchToMainThread();
+               _MergeOnComplete?.Invoke();
+            }
              catch (InvalidOperationException ex)
              {
                  Debug.LogError("Invalid Operation: " + ex.Message);
@@ -270,7 +273,6 @@ public class VideoRecordingScript : MonoBehaviour
                  UnityEngine.Debug.LogError($"오디오 병합 중 오류 발생: {e.Message}, {e.StackTrace}");
                  _MergeOnError?.Invoke();
              }
-         });
     }
     private void AudioCaptureSavePath(object sender, CaptureCompleteEventArgs args)
     {
